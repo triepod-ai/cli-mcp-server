@@ -95,8 +95,8 @@ class CommandExecutor:
 
                 # Check patterns
                 if not any(
-                    re.match(pattern, arg)
-                    for pattern in self.security_config.allowed_patterns
+                        re.match(pattern, arg)
+                        for pattern in self.security_config.allowed_patterns
                 ):
                     raise CommandSecurityError(
                         f"Argument '{arg}' doesn't match allowed patterns"
@@ -252,7 +252,7 @@ async def handle_list_tools() -> list[types.Tool]:
 
 @server.call_tool()
 async def handle_call_tool(
-    name: str, arguments: Optional[Dict[str, Any]]
+        name: str, arguments: Optional[Dict[str, Any]]
 ) -> List[types.TextContent]:
     if name == "run_command":
         if not arguments or "command" not in arguments:
