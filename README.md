@@ -135,6 +135,7 @@ Add to your `~/Library/Application\ Support/Claude/claude_desktop_config.json`:
   }
 }
 ```
+> In case it's not working or showing in the UI, clear your cache via `uv clean`.
 
 ## Security Features
 
