@@ -196,7 +196,7 @@ You can launch the MCP Inspector via [`npm`](https://docs.npmjs.com/downloading-
 this command:
 
 ```bash
-npx @modelcontextprotocol/inspector uv --directory {{your source code local directory}}/unichat-mcp-server run unichat-mcp-server
+npx @modelcontextprotocol/inspector uv --directory {{your source code local directory}}/cli-mcp-server run cli-mcp-server
 ```
 
 Upon launching, the Inspector will display a URL that you can access in your browser to begin debugging.
