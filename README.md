@@ -9,6 +9,7 @@ features.
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)
 ![MCP Protocol](https://img.shields.io/badge/MCP-Compatible-green)
+[![smithery badge](https://smithery.ai/badge/cli-mcp-server)](https://smithery.ai/protocol/cli-mcp-server)
 
 ---
 
@@ -61,6 +62,14 @@ Configure the server using environment variables:
 | `ALLOWED_PATTERNS`   | Comma-separated file patterns            | `*.txt,*.log,*.md` |
 | `MAX_COMMAND_LENGTH` | Maximum command string length            | `1024`             |
 | `COMMAND_TIMEOUT`    | Command execution timeout (seconds)      | `30`               |
+
+## Installation
+
+To install CLI MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/protocol/cli-mcp-server):
+
+```bash
+npx @smithery/cli install cli-mcp-server --client claude
+```
 
 ## Available Tools
 
