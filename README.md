@@ -59,7 +59,6 @@ Configure the server using environment variables:
 | `ALLOWED_DIR`        | Base directory for command execution     | Required           |
 | `ALLOWED_COMMANDS`   | Comma-separated list of allowed commands | `ls,cat,pwd`       |
 | `ALLOWED_FLAGS`      | Comma-separated list of allowed flags    | `-l,-a,--help`     |
-| `ALLOWED_PATTERNS`   | Comma-separated file patterns            | `*.txt,*.log,*.md` |
 | `MAX_COMMAND_LENGTH` | Maximum command string length            | `1024`             |
 | `COMMAND_TIMEOUT`    | Command execution timeout (seconds)      | `30`               |
 
@@ -113,7 +112,6 @@ Add to your `~/Library/Application\ Support/Claude/claude_desktop_config.json`:
         "ALLOWED_DIR": "</your/desired/dir>",
         "ALLOWED_COMMANDS": "ls,cat,pwd,echo",
         "ALLOWED_FLAGS": "-l,-a,--help,--version",
-        "ALLOWED_PATTERNS": "*.txt,*.log,*.md",
         "MAX_COMMAND_LENGTH": "1024",
         "COMMAND_TIMEOUT": "30"
       }
@@ -136,7 +134,6 @@ Add to your `~/Library/Application\ Support/Claude/claude_desktop_config.json`:
         "ALLOWED_DIR": "</your/desired/dir>",
         "ALLOWED_COMMANDS": "ls,cat,pwd,echo",
         "ALLOWED_FLAGS": "-l,-a,--help,--version",
-        "ALLOWED_PATTERNS": "*.txt,*.log,*.md",
         "MAX_COMMAND_LENGTH": "1024",
         "COMMAND_TIMEOUT": "30"
       }
