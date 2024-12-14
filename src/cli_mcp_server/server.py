@@ -13,10 +13,26 @@ from mcp.server.models import InitializationOptions
 server = Server("cli-mcp-server")
 
 
-class CommandSecurityError(Exception):
-    """
-    Custom exception for command security violations
-    """
+class CommandError(Exception):
+    """Base exception for command-related errors"""
+
+    pass
+
+
+class CommandSecurityError(CommandError):
+    """Security violation errors"""
+
+    pass
+
+
+class CommandExecutionError(CommandError):
+    """Command execution errors"""
+
+    pass
+
+
+class CommandTimeoutError(CommandError):
+    """Command timeout errors"""
 
     pass
 
@@ -29,7 +45,6 @@ class SecurityConfig:
 
     allowed_commands: set[str]
     allowed_flags: set[str]
-    allowed_patterns: List[str]
     max_command_length: int
     command_timeout: int
 
@@ -40,6 +55,27 @@ class CommandExecutor:
             raise ValueError("Valid ALLOWED_DIR is required")
         self.allowed_dir = os.path.abspath(os.path.realpath(allowed_dir))
         self.security_config = security_config
+
+    def _normalize_path(self, path: str) -> str:
+        """
+        Normalizes a path and ensures it's within allowed directory.
+        """
+        try:
+            if os.path.isabs(path):
+                # If absolute path, check directly
+                real_path = os.path.abspath(os.path.realpath(path))
+            else:
+                # If relative path, combine with allowed_dir first
+                real_path = os.path.abspath(os.path.realpath(os.path.join(self.allowed_dir, path)))
+
+            if not self._is_path_safe(real_path):
+                raise CommandSecurityError(f"Path '{path}' is outside of allowed directory: {self.allowed_dir}")
+
+            return real_path
+        except CommandSecurityError:
+            raise
+        except Exception as e:
+            raise CommandSecurityError(f"Invalid path '{path}': {str(e)}")
 
     def validate_command(self, command_string: str) -> tuple[str, List[str]]:
         """
@@ -64,10 +100,7 @@ class CommandExecutor:
         shell_operators = ["&&", "||", "|", ">", ">>", "<", "<<", ";"]
         for operator in shell_operators:
             if operator in command_string:
-                raise CommandSecurityError(
-                    f"Shell operator '{operator}' is not supported. "
-                    "Only single commands are allowed."
-                )
+                raise CommandSecurityError(f"Shell operator '{operator}' is not supported")
 
         try:
             parts = shlex.split(command_string)
@@ -80,29 +113,25 @@ class CommandExecutor:
             if command not in self.security_config.allowed_commands:
                 raise CommandSecurityError(f"Command '{command}' is not allowed")
 
-            # Validate arguments
+            # Process and validate arguments
+            validated_args = []
             for arg in args:
                 if arg.startswith("-"):
                     if arg not in self.security_config.allowed_flags:
                         raise CommandSecurityError(f"Flag '{arg}' is not allowed")
+                    validated_args.append(arg)
                     continue
 
-                # Validate path if argument looks like a path
-                if "/" in arg or "\\" in arg or os.path.isabs(arg):
-                    full_path = os.path.abspath(os.path.join(self.allowed_dir, arg))
-                    if not self._is_path_safe(full_path):
-                        raise CommandSecurityError(f"Path '{arg}' is not allowed")
+                # For any path-like argument, validate it
+                if "/" in arg or "\\" in arg or os.path.isabs(arg) or arg == ".":
+                    normalized_path = self._normalize_path(arg)
+                    validated_args.append(normalized_path)
+                else:
+                    # For non-path arguments, add them as-is
+                    validated_args.append(arg)
 
-                # Check patterns
-                if not any(
-                        re.match(pattern, arg)
-                        for pattern in self.security_config.allowed_patterns
-                ):
-                    raise CommandSecurityError(
-                        f"Argument '{arg}' doesn't match allowed patterns"
-                    )
+            return command, validated_args
 
-            return command, args
         except ValueError as e:
             raise CommandSecurityError(f"Invalid command format: {str(e)}")
 
@@ -123,8 +152,12 @@ class CommandExecutor:
         Private method intended for internal use only.
         """
         try:
-            abs_path = os.path.abspath(os.path.realpath(path))
-            return abs_path.startswith(self.allowed_dir)
+            # Resolve any symlinks and get absolute path
+            real_path = os.path.abspath(os.path.realpath(path))
+            allowed_dir_real = os.path.abspath(os.path.realpath(self.allowed_dir))
+
+            # Check if the path starts with allowed_dir
+            return real_path.startswith(allowed_dir_real)
         except Exception:
             return False
 
@@ -155,11 +188,11 @@ class CommandExecutor:
             - Captures both stdout and stderr
         """
         if len(command_string) > self.security_config.max_command_length:
-            raise CommandSecurityError("Command string too long")
+            raise CommandSecurityError(f"Command exceeds maximum length of {self.security_config.max_command_length}")
 
         try:
-
             command, args = self.validate_command(command_string)
+
             return subprocess.run(
                 [command] + args,
                 shell=False,
@@ -168,10 +201,12 @@ class CommandExecutor:
                 timeout=self.security_config.command_timeout,
                 cwd=self.allowed_dir,
             )
+        except subprocess.TimeoutExpired:
+            raise CommandTimeoutError(f"Command timed out after {self.security_config.command_timeout} seconds")
+        except CommandError:
+            raise
         except Exception as e:
-            if isinstance(e, CommandSecurityError):
-                raise
-            raise CommandSecurityError(f"Command execution failed: {str(e)}")
+            raise CommandExecutionError(f"Command execution failed: {str(e)}")
 
 
 # Load security configuration from environment
@@ -187,7 +222,6 @@ def load_security_config() -> SecurityConfig:
         SecurityConfig: Configuration object containing:
             - allowed_commands: Set of permitted command names
             - allowed_flags: Set of permitted command flags/options
-            - allowed_patterns: List of regex patterns for valid inputs
             - max_command_length: Maximum length of command string
             - command_timeout: Maximum execution time in seconds
 
@@ -201,18 +235,12 @@ def load_security_config() -> SecurityConfig:
     return SecurityConfig(
         allowed_commands=set(os.getenv("ALLOWED_COMMANDS", "ls,cat,pwd").split(",")),
         allowed_flags=set(os.getenv("ALLOWED_FLAGS", "-l,-a,--help").split(",")),
-        allowed_patterns=[
-            r"^[\w\-. ]+$",  # Basic filename pattern
-            *os.getenv("ALLOWED_PATTERNS", "*.txt,*.log,*.md").split(","),
-        ],
         max_command_length=int(os.getenv("MAX_COMMAND_LENGTH", "1024")),
         command_timeout=int(os.getenv("COMMAND_TIMEOUT", "30")),
     )
 
 
-executor = CommandExecutor(
-    allowed_dir=os.getenv("ALLOWED_DIR", ""), security_config=load_security_config()
-)
+executor = CommandExecutor(allowed_dir=os.getenv("ALLOWED_DIR", ""), security_config=load_security_config())
 
 
 @server.list_tools()
@@ -231,7 +259,7 @@ async def handle_list_tools() -> list[types.Tool]:
                 "properties": {
                     "command": {
                         "type": "string",
-                        "description": "Single command to execute (example: 'ls -l' or 'cat file.txt')"
+                        "description": "Single command to execute (example: 'ls -l' or 'cat file.txt')",
                     }
                 },
                 "required": ["command"],
@@ -239,26 +267,20 @@ async def handle_list_tools() -> list[types.Tool]:
         ),
         types.Tool(
             name="show_security_rules",
-            description=(
-                "Show what commands and operations are allowed in this environment.\n"
-            ),
+            description=("Show what commands and operations are allowed in this environment.\n"),
             inputSchema={
                 "type": "object",
                 "properties": {},
             },
-        )
+        ),
     ]
 
 
 @server.call_tool()
-async def handle_call_tool(
-        name: str, arguments: Optional[Dict[str, Any]]
-) -> List[types.TextContent]:
+async def handle_call_tool(name: str, arguments: Optional[Dict[str, Any]]) -> List[types.TextContent]:
     if name == "run_command":
         if not arguments or "command" not in arguments:
-            return [
-                types.TextContent(type="text", text="No command provided", error=True)
-            ]
+            return [types.TextContent(type="text", text="No command provided", error=True)]
 
         try:
             result = executor.execute(arguments["command"])
@@ -267,9 +289,7 @@ async def handle_call_tool(
             if result.stdout:
                 response.append(types.TextContent(type="text", text=result.stdout))
             if result.stderr:
-                response.append(
-                    types.TextContent(type="text", text=result.stderr, error=True)
-                )
+                response.append(types.TextContent(type="text", text=result.stderr, error=True))
 
             response.append(
                 types.TextContent(
@@ -281,11 +301,7 @@ async def handle_call_tool(
             return response
 
         except CommandSecurityError as e:
-            return [
-                types.TextContent(
-                    type="text", text=f"Security violation: {str(e)}", error=True
-                )
-            ]
+            return [types.TextContent(type="text", text=f"Security violation: {str(e)}", error=True)]
         except subprocess.TimeoutExpired:
             return [
                 types.TextContent(
@@ -308,9 +324,6 @@ async def handle_call_tool(
             f"\nAllowed Flags:\n"
             f"-------------\n"
             f"{', '.join(sorted(executor.security_config.allowed_flags))}\n"
-            f"\nAllowed Patterns:\n"
-            f"----------------\n"
-            f"{', '.join(executor.security_config.allowed_patterns)}\n"
             f"\nSecurity Limits:\n"
             f"---------------\n"
             f"Max Command Length: {executor.security_config.max_command_length} characters\n"
