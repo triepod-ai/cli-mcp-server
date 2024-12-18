@@ -47,6 +47,8 @@ class SecurityConfig:
     allowed_flags: set[str]
     max_command_length: int
     command_timeout: int
+    allow_all_commands: bool = False
+    allow_all_flags: bool = False
 
 
 class CommandExecutor:
@@ -109,15 +111,15 @@ class CommandExecutor:
 
             command, args = parts[0], parts[1:]
 
-            # Validate command
-            if command not in self.security_config.allowed_commands:
+            # Validate command if not in allow-all mode
+            if not self.security_config.allow_all_commands and command not in self.security_config.allowed_commands:
                 raise CommandSecurityError(f"Command '{command}' is not allowed")
 
             # Process and validate arguments
             validated_args = []
             for arg in args:
                 if arg.startswith("-"):
-                    if arg not in self.security_config.allowed_flags:
+                    if not self.security_config.allow_all_flags and arg not in self.security_config.allowed_flags:
                         raise CommandSecurityError(f"Flag '{arg}' is not allowed")
                     validated_args.append(arg)
                     continue
@@ -224,19 +226,28 @@ def load_security_config() -> SecurityConfig:
             - allowed_flags: Set of permitted command flags/options
             - max_command_length: Maximum length of command string
             - command_timeout: Maximum execution time in seconds
+            - allow_all_commands: Whether all commands are allowed
+            - allow_all_flags: Whether all flags are allowed
 
     Environment Variables:
-        ALLOWED_COMMANDS: Comma-separated list of allowed commands (default: "ls,cat,pwd")
-        ALLOWED_FLAGS: Comma-separated list of allowed flags (default: "-l,-a,--help")
-        ALLOWED_PATTERNS: Comma-separated list of patterns (default: "*.txt,*.log,*.md")
+        ALLOWED_COMMANDS: Comma-separated list of allowed commands or 'all' (default: "ls,cat,pwd")
+        ALLOWED_FLAGS: Comma-separated list of allowed flags or 'all' (default: "-l,-a,--help")
         MAX_COMMAND_LENGTH: Maximum command string length (default: 1024)
         COMMAND_TIMEOUT: Command timeout in seconds (default: 30)
     """
+    allowed_commands = os.getenv("ALLOWED_COMMANDS", "ls,cat,pwd")
+    allowed_flags = os.getenv("ALLOWED_FLAGS", "-l,-a,--help")
+    
+    allow_all_commands = allowed_commands.lower() == 'all'
+    allow_all_flags = allowed_flags.lower() == 'all'
+    
     return SecurityConfig(
-        allowed_commands=set(os.getenv("ALLOWED_COMMANDS", "ls,cat,pwd").split(",")),
-        allowed_flags=set(os.getenv("ALLOWED_FLAGS", "-l,-a,--help").split(",")),
+        allowed_commands=set() if allow_all_commands else set(allowed_commands.split(",")),
+        allowed_flags=set() if allow_all_flags else set(allowed_flags.split(",")),
         max_command_length=int(os.getenv("MAX_COMMAND_LENGTH", "1024")),
         command_timeout=int(os.getenv("COMMAND_TIMEOUT", "30")),
+        allow_all_commands=allow_all_commands,
+        allow_all_flags=allow_all_flags,
     )
 
 
@@ -245,13 +256,16 @@ executor = CommandExecutor(allowed_dir=os.getenv("ALLOWED_DIR", ""), security_co
 
 @server.list_tools()
 async def handle_list_tools() -> list[types.Tool]:
+    commands_desc = "all commands" if executor.security_config.allow_all_commands else ", ".join(executor.security_config.allowed_commands)
+    flags_desc = "all flags" if executor.security_config.allow_all_flags else ", ".join(executor.security_config.allowed_flags)
+    
     return [
         types.Tool(
             name="run_command",
             description=(
                 f"Allows command (CLI) execution in the directory: {executor.allowed_dir}\n\n"
-                f"Available commands: {', '.join(executor.security_config.allowed_commands)}\n"
-                f"Available flags: {', '.join(executor.security_config.allowed_flags)}\n\n"
+                f"Available commands: {commands_desc}\n"
+                f"Available flags: {flags_desc}\n\n"
                 "Note: Shell operators (&&, |, >, >>) are not supported."
             ),
             inputSchema={
@@ -314,16 +328,19 @@ async def handle_call_tool(name: str, arguments: Optional[Dict[str, Any]]) -> Li
             return [types.TextContent(type="text", text=f"Error: {str(e)}", error=True)]
 
     elif name == "show_security_rules":
+        commands_desc = "All commands allowed" if executor.security_config.allow_all_commands else ", ".join(sorted(executor.security_config.allowed_commands))
+        flags_desc = "All flags allowed" if executor.security_config.allow_all_flags else ", ".join(sorted(executor.security_config.allowed_flags))
+        
         security_info = (
             "Security Configuration:\n"
             f"==================\n"
             f"Working Directory: {executor.allowed_dir}\n"
             f"\nAllowed Commands:\n"
             f"----------------\n"
-            f"{', '.join(sorted(executor.security_config.allowed_commands))}\n"
+            f"{commands_desc}\n"
             f"\nAllowed Flags:\n"
             f"-------------\n"
-            f"{', '.join(sorted(executor.security_config.allowed_flags))}\n"
+            f"{flags_desc}\n"
             f"\nSecurity Limits:\n"
             f"---------------\n"
             f"Max Command Length: {executor.security_config.max_command_length} characters\n"
@@ -341,7 +358,7 @@ async def main():
             write_stream,
             InitializationOptions(
                 server_name="cli-mcp-server",
-                server_version="0.2.0",
+                server_version="0.2.1",
                 capabilities=server.get_capabilities(
                     notification_options=NotificationOptions(),
                     experimental_capabilities={},
