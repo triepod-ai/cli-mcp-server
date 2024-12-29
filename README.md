@@ -3,8 +3,7 @@
 ---
 
 A secure Model Context Protocol (MCP) server implementation for executing controlled command-line operations with
-comprehensive security
-features.
+comprehensive security features.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)
@@ -39,30 +38,32 @@ features.
 ## Overview
 
 This MCP server enables secure command-line execution with robust security measures including command whitelisting, path
-validation, and
-execution controls. Perfect for providing controlled CLI access to LLM applications while maintaining security.
+validation, and execution controls. Perfect for providing controlled CLI access to LLM applications while maintaining security.
 
 ## Features
 
 - 🔒 Secure command execution with strict validation
-- ⚙️ Configurable command and flag whitelisting
-- 🛡️ Path traversal prevention
+- ⚙️ Configurable command and flag whitelisting with 'all' option
+- 🛡️ Path traversal prevention and validation
 - 🚫 Shell operator injection protection
 - ⏱️ Execution timeouts and length limits
 - 📝 Detailed error reporting
 - 🔄 Async operation support
+- 🎯 Working directory restriction and validation
 
 ## Configuration
 
 Configure the server using environment variables:
 
-| Variable             | Description                              | Default            |
- |----------------------|------------------------------------------|--------------------|
-| `ALLOWED_DIR`        | Base directory for command execution     | Required           |
-| `ALLOWED_COMMANDS`   | Comma-separated list of allowed commands | `ls,cat,pwd`       |
-| `ALLOWED_FLAGS`      | Comma-separated list of allowed flags    | `-l,-a,--help`     |
-| `MAX_COMMAND_LENGTH` | Maximum command string length            | `1024`             |
-| `COMMAND_TIMEOUT`    | Command execution timeout (seconds)      | `30`               |
+| Variable             | Description                                          | Default            |
+|---------------------|------------------------------------------------------|-------------------|
+| `ALLOWED_DIR`       | Base directory for command execution (Required)      | None (Required)   |
+| `ALLOWED_COMMANDS`  | Comma-separated list of allowed commands or 'all'    | `ls,cat,pwd`      |
+| `ALLOWED_FLAGS`     | Comma-separated list of allowed flags or 'all'       | `-l,-a,--help`    |
+| `MAX_COMMAND_LENGTH`| Maximum command string length                        | `1024`            |
+| `COMMAND_TIMEOUT`   | Command execution timeout (seconds)                  | `30`              |
+
+Note: Setting `ALLOWED_COMMANDS` or `ALLOWED_FLAGS` to 'all' will allow any command or flag respectively.
 
 ## Installation
 
@@ -79,19 +80,28 @@ npx @smithery/cli install cli-mcp-server --client claude
 Executes whitelisted CLI commands within allowed directories.
 
 **Input Schema:**
-
- ```json
- {
+```json
+{
   "command": {
     "type": "string",
-    "description": "Command to execute (e.g., 'ls -l' or 'cat file.txt')"
+    "description": "Single command to execute (e.g., 'ls -l' or 'cat file.txt')"
   }
 }
- ```
+```
+
+**Security Notes:**
+- Shell operators (&&, |, >, >>) are not supported
+- Commands must be whitelisted unless ALLOWED_COMMANDS='all'
+- Flags must be whitelisted unless ALLOWED_FLAGS='all'
+- All paths are validated to be within ALLOWED_DIR
 
 ### show_security_rules
 
-Displays current security configuration and restrictions.
+Displays current security configuration and restrictions, including:
+- Working directory
+- Allowed commands
+- Allowed flags
+- Security limits (max command length and timeout)
 
 ## Usage with Claude Desktop
 
@@ -99,7 +109,7 @@ Add to your `~/Library/Application\ Support/Claude/claude_desktop_config.json`:
 
 > Development/Unpublished Servers Configuration
 
- ```json
+```json
 {
   "mcpServers": {
     "cli-mcp-server": {
@@ -120,7 +130,7 @@ Add to your `~/Library/Application\ Support/Claude/claude_desktop_config.json`:
     }
   }
 }
- ```
+```
 
 > Published Servers Configuration
 
@@ -147,23 +157,25 @@ Add to your `~/Library/Application\ Support/Claude/claude_desktop_config.json`:
 
 ## Security Features
 
-- ✅ Command whitelist enforcement
-- ✅ Flag validation
-- ✅ Path traversal prevention
+- ✅ Command whitelist enforcement with 'all' option
+- ✅ Flag validation with 'all' option
+- ✅ Path traversal prevention and normalization
 - ✅ Shell operator blocking
 - ✅ Command length limits
 - ✅ Execution timeouts
 - ✅ Working directory restrictions
+- ✅ Symlink resolution and validation
 
 ## Error Handling
 
 The server provides detailed error messages for:
 
-- Security violations
-- Command timeouts
+- Security violations (CommandSecurityError)
+- Command timeouts (CommandTimeoutError)
 - Invalid command formats
 - Path security violations
-- Execution failures
+- Execution failures (CommandExecutionError)
+- General command errors (CommandError)
 
 ## Development
 
@@ -171,8 +183,6 @@ The server provides detailed error messages for:
 
 - Python 3.10+
 - MCP protocol library
-
-## Development
 
 ### Building and Publishing
 
@@ -213,6 +223,6 @@ Upon launching, the Inspector will display a URL that you can access in your bro
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
- ---
+---
 
 For more information or support, please open an issue on the project repository.
