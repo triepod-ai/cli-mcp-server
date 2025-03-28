@@ -1,0 +1,7 @@
+{
+  "allowedDir": "L:\\",
+  "allowedCommands": "ls,cat,pwd,Get-ChildItem,Get-Content,Set-Location,Get-Location,Select-Object,Where-Object,Sort-Object,Measure-Object,ForEach-Object,Format-Table,Format-List,ConvertTo-Json,ConvertFrom-Json,Export-Csv,Import-Csv,Test-Path",
+  "allowedFlags": "-l,-a,--help,-Force,-Recurse,-Path,-Filter,-ErrorAction,-ErrorVariable",
+  "commandTimeout": 60,
+  "maxCommandLength": 2048
+}

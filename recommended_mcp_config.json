@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "cli-mcp-server": {
+      "command": "uvx",
+      "args": [
+        "cli-mcp-server"
+      ],
+      "env": {
+        "ALLOWED_DIR": "L:\\",
+        "ALLOWED_COMMANDS": "ls,cat,pwd,Get-ChildItem,Get-Content,Set-Location,Get-Location,Select-Object,Where-Object,Sort-Object,Measure-Object,ForEach-Object,Format-Table,Format-List,ConvertTo-Json,ConvertFrom-Json,Export-Csv,Import-Csv,Test-Path",
+        "ALLOWED_FLAGS": "-l,-a,--help,-Force,-Recurse,-Path,-Filter,-ErrorAction,-ErrorVariable",
+        "MAX_COMMAND_LENGTH": "2048",
+        "COMMAND_TIMEOUT": "60"
+      },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
